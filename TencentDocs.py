@@ -12,6 +12,10 @@ class InternalElementError(Exception):
 
 
 def web_script(url, browser, pt, input_list):
+    if not url.startswith("https://docs.qq.com/"):
+        print("这个只支持腾讯文档啊！")
+        return
+    
     # 浏览器选择
     if browser == 0:
         options = webdriver.ChromeOptions()
