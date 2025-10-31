@@ -21,14 +21,16 @@
 - 有能力者请根据实际页面自行修改选择器与等待逻辑以提高稳健性。  
 
 ---
-
+## 有空可能会更新其他的平台的。
 ## 依赖
 - Python 3.8+
 - selenium
 - 对应浏览器的 WebDriver（ChromeDriver / EdgeDriver），版本需与浏览器匹配并在 PATH 中。
 
+---
+## 有空可能会更新其他的平台的。
+---
+
 安装 selenium：
 ```bash
 pip install selenium
-
-## 有空可能会更新其他的平台的。
