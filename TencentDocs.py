@@ -11,11 +11,11 @@ class InternalElementError(Exception):
     pass
 
 
-def web_script(url, browser, pt, input_list):
+def web_launcher(url, browser):
     if not url.startswith("https://docs.qq.com/"):
         print("这个只支持腾讯文档啊！")
         return
-    
+
     # 浏览器选择
     if browser == 0:
         options = webdriver.ChromeOptions()
@@ -34,24 +34,20 @@ def web_script(url, browser, pt, input_list):
     login_button.click()
     driver.implicitly_wait(2)
 
-    qq_button = driver.find_element(By.CSS_SELECTOR, "span.qq")
-    qq_button.click()
+    return driver
 
-    while True:
-        wait_over = input("✅ 登录完了你打个 ok，别动窗口，我来抢：")
-        if wait_over.strip().lower() == 'ok':
-            break
 
-    # 如果指定时间，就等到指定时刻再刷新
-    if pt is not None:
-        exe_time = datetime.datetime(*pt)
-        wait_time = exe_time - datetime.datetime.now()
-        if wait_time.total_seconds() <= 0:
-            print('⏰ 你逗我玩呢？哥们儿有时光机吗？')
-            return
-        print(f"等待开始... 目标时间：{exe_time.strftime('%Y-%m-%d %H:%M:%S')}，还有 {wait_time.total_seconds():.1f} 秒")
-        time.sleep(wait_time.total_seconds())
+def web_timer(pt):
+    exe_time = datetime.datetime(*pt)
+    wait_time = exe_time - datetime.datetime.now()
+    if wait_time.total_seconds() <= 0:
+        print('⏰ 你逗我玩呢？哥们儿有时光机吗？')
+        return
+    print(f"等待开始... 目标时间：{exe_time.strftime('%Y-%m-%d %H:%M:%S')}，还有 {wait_time.total_seconds():.1f} 秒")
+    time.sleep(wait_time.total_seconds())
 
+
+def web_grabber(driver, input_list):
     print("🚀 开始抢填！")
     driver.execute_script("window.location.reload()")
 
@@ -84,9 +80,15 @@ def web_script(url, browser, pt, input_list):
 
 
 if __name__ == '__main__':
-    web_script(
-        "https://docs.qq.com/form/page/...",
-        1,  # 1=Edge，0=Chrome
-        (2025, 11, 1, 12, 0, 0),  # 年月日时分秒，None 表示立即执行
-        ('姓名', 'XXXX学院', '138XXXXXXXX')  # 表单内容（按顺序往下填）
-    )
+    # 你可以添加后面更多的参数，按照填报顺序即可
+    YOUR_ARG = [
+        '名字',
+        '学号',
+        '学院',
+        '...',
+    ]
+
+    auto_script = web_launcher("https://docs.qq.com/form/page/...", 1)
+    input("请完成扫码登录后按回车继续...")
+    web_timer((2025, 11, 1, 12, 0, 0))
+    web_grabber(auto_script, YOUR_ARG)
