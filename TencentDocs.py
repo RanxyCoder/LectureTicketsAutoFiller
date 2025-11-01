@@ -86,9 +86,10 @@ if __name__ == '__main__':
         '学号',
         '学院',
         '...',
+        '...'
     ]
 
-    auto_script = web_launcher("https://docs.qq.com/form/page/...", 1)
+    auto_script = web_launcher("https://docs.qq.com/form/page/DR29acHB3WEtvbUNT", 1)
     input("请完成扫码登录后按回车继续...")
-    web_timer((2025, 11, 1, 12, 0, 0))
+    web_timer((2025, 11, 1, 19, 0, 0))
     web_grabber(auto_script, YOUR_ARG)
