@@ -23,7 +23,7 @@ class TencentDocsGUI(QWidget):
         self.signals = Signals()
 
         self.setWindowTitle("腾讯文档抢填器")
-        self.resize(600, 500)
+        self.resize(300, 250)
 
         layout = QVBoxLayout()
 
@@ -62,7 +62,7 @@ class TencentDocsGUI(QWidget):
         # 第四行：表单内容 + 运行
         row4 = QHBoxLayout()
         self.text_inputs = QTextEdit()
-        self.text_inputs.setPlaceholderText("每行一个字段，按顺序填写\n例如：\n张三\n2021001\n计算机学院")
+        self.text_inputs.setPlaceholderText("每行一个字段，按顺序填写\n例如：\n张三\n机电工程学院\n211250xxxx")
         row4.addWidget(self.text_inputs)
         self.btn_run = QPushButton("运行")
         row4.addWidget(self.btn_run)
