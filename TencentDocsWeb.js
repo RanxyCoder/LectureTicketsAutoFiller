@@ -75,5 +75,4 @@
         console.log('页面加载完成');
         waitUntil(targetTime, fillForm);
     });
-
 })();
