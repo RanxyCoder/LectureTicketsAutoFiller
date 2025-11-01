@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         QQ Docs Auto Fill
+// @name         TencentDocsAutoFiller
 // @namespace    http://tampermonkey.net/
 // @version      1.0
-// @description  自动填腾讯文档表单
+// @description  自动填腾讯文档填写
 // @author       Ranxy
 // @match        https://docs.qq.com/form/page/*
 // @grant        none
