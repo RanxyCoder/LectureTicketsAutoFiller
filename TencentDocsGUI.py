@@ -4,28 +4,37 @@ from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTextEdit, QRadioButton,
     QButtonGroup, QCheckBox, QMessageBox, QDateTimeEdit
 )
-from PySide6.QtCore import QDateTime
-from TencentDocs import web_launcher, web_grabber
+from PySide6.QtCore import QDateTime, QObject, Signal, QTimer
+from TencentDocs import web_launcher, web_grabber, InternalElementError
 import datetime
 import time
+
+
+class Signals(QObject):
+    update_status = Signal(str)
+    set_button_text = Signal(str)
+    set_button_enabled = Signal(bool)
 
 
 class TencentDocsGUI(QWidget):
     def __init__(self):
         super().__init__()
         self.driver = None
+        self.signals = Signals()
+
         self.setWindowTitle("腾讯文档抢填器")
+        self.resize(600, 500)
 
         layout = QVBoxLayout()
 
-        # -------- 第一行：网址 --------
+        # 第一行：网址
         row1 = QHBoxLayout()
         row1.addWidget(QLabel("网址："))
-        self.url_edit = QLineEdit()
+        self.url_edit = QLineEdit("https://docs.qq.com/form/page/你的表单ID")
         row1.addWidget(self.url_edit)
         layout.addLayout(row1)
 
-        # -------- 第二行：浏览器选择 + 启动按钮 --------
+        # 第二行：浏览器 + 启动
         row2 = QHBoxLayout()
         self.radio_chrome = QRadioButton("Chrome")
         self.radio_chrome.setChecked(True)
@@ -39,103 +48,144 @@ class TencentDocsGUI(QWidget):
         row2.addWidget(self.btn_web_launch)
         layout.addLayout(row2)
 
-        # -------- 第三行：定时器 --------
+        # 第三行：定时器
         row3 = QHBoxLayout()
         self.checkbox_timer = QCheckBox("定时器")
         self.checkbox_timer.setChecked(True)
         row3.addWidget(self.checkbox_timer)
-        self.datetime_edit = QDateTimeEdit(QDateTime.currentDateTime())
+        self.datetime_edit = QDateTimeEdit()
         self.datetime_edit.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
+        self.datetime_edit.setDateTime(QDateTime.currentDateTime().addSecs(60))  # 默认 +60秒
         row3.addWidget(self.datetime_edit)
         layout.addLayout(row3)
 
-        # -------- 第四行：表单内容 + 运行按钮 --------
+        # 第四行：表单内容 + 运行
         row4 = QHBoxLayout()
         self.text_inputs = QTextEdit()
+        self.text_inputs.setPlaceholderText("每行一个字段，按顺序填写\n例如：\n张三\n2021001\n计算机学院")
         row4.addWidget(self.text_inputs)
         self.btn_run = QPushButton("运行")
         row4.addWidget(self.btn_run)
         layout.addLayout(row4)
 
-        # 状态显示
-        self.status_label = QLabel("")
+        # 状态栏
+        self.status_label = QLabel("就绪")
         layout.addWidget(self.status_label)
 
         self.setLayout(layout)
 
-        # 绑定事件
+        # 信号连接
+        self.signals.update_status.connect(self.status_label.setText)
+        self.signals.set_button_text.connect(self.btn_run.setText)
+        self.signals.set_button_enabled.connect(self.btn_run.setEnabled)
+
+        # 事件绑定
         self.btn_web_launch.clicked.connect(self.launch_browser)
         self.btn_run.clicked.connect(self.run_grabber)
         self.checkbox_timer.stateChanged.connect(self.toggle_datetime_edit)
 
-        # 初始化时间控件状态
-        self.toggle_datetime_edit(self.checkbox_timer.checkState())
+        # 关键：延迟初始化，确保状态同步
+        QTimer.singleShot(0, self._init_timer_state)
 
-    # -------- 槽函数 --------
+    def _init_timer_state(self):
+        self.datetime_edit.setEnabled(self.checkbox_timer.isChecked())
+
     def toggle_datetime_edit(self, state):
-        """勾选定时器才启用时间控件"""
-        self.datetime_edit.setEnabled(state == 2)  # 2 = Qt.Checked
+        self.datetime_edit.setEnabled(self.checkbox_timer.isChecked())
 
     def launch_browser(self):
         url = self.url_edit.text().strip()
+        if not url:
+            QMessageBox.warning(self, "提示", "请输入腾讯文档网址")
+            return
+
         browser = self.browser_group.checkedId()
-        try:
-            self.driver = web_launcher(url, browser)
-            self.status_label.setText("✅ 浏览器已启动，请扫码登录")
-            # 禁用第一、二行控件
-            self.url_edit.setDisabled(True)
-            self.radio_chrome.setDisabled(True)
-            self.radio_edge.setDisabled(True)
-            self.btn_web_launch.setDisabled(True)
-        except Exception as e:
-            QMessageBox.critical(self, "错误", str(e))
+        self.btn_web_launch.setDisabled(True)
+        self.signals.update_status.emit("正在启动浏览器...")
+
+        def _launch():
+            try:
+                self.driver = web_launcher(url, browser)
+                self.signals.update_status.emit("浏览器已启动，请扫码登录腾讯文档")
+                # 禁用启动相关控件
+                self.url_edit.setDisabled(True)
+                self.radio_chrome.setDisabled(True)
+                self.radio_edge.setDisabled(True)
+            except Exception as e:
+                self.signals.update_status.emit(f"启动失败：{e}")
+                QMessageBox.critical(self, "错误", str(e))
+            finally:
+                self.btn_web_launch.setDisabled(False)
+
+        threading.Thread(target=_launch, daemon=True).start()
 
     def run_grabber(self):
         if not self.driver:
             QMessageBox.warning(self, "提示", "请先启动浏览器并登录")
             return
 
-        # 获取表单内容
-        input_list = [line.strip() for line in self.text_inputs.toPlainText().splitlines() if line.strip()]
-        if not input_list:
+        input_text = self.text_inputs.toPlainText().strip()
+        if not input_text:
             QMessageBox.warning(self, "提示", "请输入表单内容")
             return
 
-        # 获取定时时间
+        input_list = [line.strip() for line in input_text.splitlines() if line.strip()]
+        if not input_list:
+            QMessageBox.warning(self, "提示", "表单内容不能为空")
+            return
+
+        target_time = None
         if self.checkbox_timer.isChecked():
             dt = self.datetime_edit.dateTime().toPython()
+            if dt <= datetime.datetime.now():
+                QMessageBox.warning(self, "提示", "定时时间不能早于当前时间")
+                return
             target_time = dt
-        else:
-            target_time = None
 
-        # 禁用输入控件
-        self.datetime_edit.setDisabled(True)
-        self.checkbox_timer.setDisabled(True)
-        self.text_inputs.setDisabled(True)
-        self.btn_run.setText("计时中...")
-        self.btn_run.setDisabled(True)
+        # 禁用控件
+        self._lock_ui(True)
+        self.signals.update_status.emit("准备就绪，等待执行...")
 
-        # 用线程执行
-        thread = threading.Thread(target=self._grab_thread, args=(input_list, target_time), daemon=True)
+        thread = threading.Thread(
+            target=self._grab_thread,
+            args=(input_list, target_time),
+            daemon=True
+        )
         thread.start()
 
-    def _grab_thread(self, input_list, target_time):
-        # 等待定时
-        if target_time:
-            now = datetime.datetime.now()
-            wait_seconds = (target_time - now).total_seconds()
-            if wait_seconds > 0:
-                self.status_label.setText(f"⏳ 等待开始... 还有 {wait_seconds:.1f} 秒")
-                time.sleep(wait_seconds)
+    def _lock_ui(self, lock=True):
+        self.checkbox_timer.setDisabled(lock)
+        self.datetime_edit.setDisabled(lock)
+        self.text_inputs.setDisabled(lock)
+        self.btn_run.setDisabled(lock)
+        self.btn_run.setText("计时中..." if lock else "运行")
 
+    def _grab_thread(self, input_list, target_time):
         try:
-            print(input_list)
+            if target_time:
+                wait_secs = (target_time - datetime.datetime.now()).total_seconds()
+                if wait_secs > 0:
+                    for remaining in range(int(wait_secs), 0, -1):
+                        self.signals.update_status.emit(f"倒计时：{remaining} 秒")
+                        time.sleep(1)
+                    self.signals.update_status.emit("开始抢填！")
+
             web_grabber(self.driver, input_list)
-            self.status_label.setText("✅ 抢填完成！")
-            self.btn_run.setText("运行")
-            self.btn_run.setDisabled(False)
+            self.signals.update_status.emit("抢填成功！")
+        except InternalElementError as e:
+            self.signals.update_status.emit(f"表单错误：{e}")
         except Exception as e:
-            self.status_label.setText(f"❌ 出错：{e}")
+            self.signals.update_status.emit(f"执行失败：{e}")
+        finally:
+            self._lock_ui(False)
+
+    def closeEvent(self, event):
+        if self.driver:
+            try:
+                self.driver.quit()
+            except:
+                pass
+        event.accept()
 
 
 if __name__ == "__main__":
